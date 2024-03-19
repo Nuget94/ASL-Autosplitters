@@ -1,5 +1,5 @@
 //////////////////////////////////////////////////////////////
-/*              Autosplitter for Gothic 2  v.3              */
+/*              Autosplitter for Gothic 2  v.4              */
 //////////////////////////////////////////////////////////////
 /*                                                          */
 /*Based on the Autosplitter by thekovic                     */
@@ -44,7 +44,7 @@ state("Gothic2", "v1.30")
     int guild:          "Gothic2.exe",        0x004C0664,   0x21C;
     int world:          "Gothic2.exe",        0x004C0664,   0xB8,   0x91C;
     int zurisHealth:    "Gothic2.exe",        0x004C6334,   0xDBC,  0x8,    0x1A4;
-    int undeadDragon:	"Gothic2.exe",        0x0057DC48,   0xC,    0x1A4;
+    int undeadDragon:	"Gothic2.exe",        0x00581B44,   0x4,    0x14,   0x10,    0xA0,   0x1A4;
     int gold:	        "Gothic2.exe",        0x004C0664,   0x68C,  0x8,    0x4,    0x318;
 }
 state("Gothic2Classic") 
@@ -96,20 +96,6 @@ startup
     settings.Add("splitLeaveValley"					, true	, "Split on leaving Valley of Mines"		, "notrAnyPercent"	);
     settings.Add("splitIrdorath"					, true	, "Split on entering Irdorath"				, "notrAnyPercent"	);
     settings.Add("splitUndeadDragon"				, false	, "Split on killing Undead Dragon"			, "notrAnyPercent"	);
-    
-    vars.currentWorld = 0;
-    vars.oldWorld = 0;
-
-    vars.fireDragonDead = 0;
-    vars.rockDragonDead = 0;
-    vars.swampDragonDead = 0;
-    vars.iceDragonDead = 0;
-
-    vars.reachedValley = 0;
-    vars.leftValley = 0;
-    vars.reachedIrdorath = 0;
-
-    vars.hasTalked = 0;
 
     // Classic Split Settings
     //			Settings Name						BoolValue	Description									ParentFlag/Setting
@@ -126,47 +112,67 @@ startup
     settings.Add("splitOnUndeadDragonDies"			, true	, "The undead dragon is dead"				, "classicSplits"	);
     settings.Add("splitOnGameOver"					, true	, "Talk to the captain"						, "classicSplits"	);
 
-    vars.currentSplit = "splitOnChapter2";
-    vars.chapter = 0;
-    vars.gameOver = false;
+    Func<bool> ResetVars = () =>
+    {
+        vars.currentWorld = 0;
+        vars.oldWorld = 0;
+        vars.fireDragonDead = 0;
+        vars.rockDragonDead = 0;
+        vars.swampDragonDead = 0;
+        vars.iceDragonDead = 0;
+        vars.reachedValley = 0;
+        vars.leftValley = 0;
+        vars.reachedIrdorath = 0;
+        vars.hasTalked = 0;
+
+        vars.currentSplit = "splitOnChapter2";
+        vars.chapter = 0;
+        vars.gameOver = false;
+        vars.undeadDragonIsSpawned = false;
+        vars.frameCounterInGameTimeUnchanged = 0;
+        vars.undeadDragonKilledAt = 0;
+        print("RESET");
+        return true;
+    };
+    vars.ResetVars = ResetVars;
     
     // General Settings
 	settings.Add("resetNewGame"						, true	, "Reset and start timer on New Game"							);
+
+    Func<bool> NextSplit = () =>
+    {
+        if      (vars.currentSplit == "splitOnChapter2"				        )   vars.currentSplit = "splitOnEnterMineValley" ;
+        else if (vars.currentSplit == "splitOnEnterMineValley"		        )   vars.currentSplit = "splitOnChapter3" ;
+        else if (vars.currentSplit == "splitOnChapter3"				        )   vars.currentSplit = "splitOnZurisIsDead" ;
+        else if (vars.currentSplit == "splitOnZurisIsDead"			        )   vars.currentSplit = "splitOnBecomeMiliz" ;
+        else if (vars.currentSplit == "splitOnBecomeMiliz"			        )   vars.currentSplit = "splitOnBecomePaladin" ;
+        else if (vars.currentSplit == "splitOnBecomePaladin"			    )   vars.currentSplit = "splitOnChapter4" ;
+        else if (vars.currentSplit == "splitOnChapter4"				        )   vars.currentSplit = "splitOnChapter5" ;
+        else if (vars.currentSplit == "splitOnChapter5"				        )   vars.currentSplit = "splitOnChapter6" ;
+        else if (vars.currentSplit == "splitOnChapter6"				        )   vars.currentSplit = "splitOnUndeadDragonDies" ;
+        else if (vars.currentSplit == "splitOnUndeadDragonDies"		        )   vars.currentSplit = "splitOnGameOver" ;
+        else if (vars.currentSplit == "splitOnGameOver"				        )   {vars.currentSplit = "GAMEOVER"; vars.gameOver = true;}
+        print("Next Split " + vars.currentSplit);
+        return true;
+    };
+    vars.NextSplit = NextSplit;
+
+    ResetVars();
 }
 
 reset 
 {
 	// if automatic reset is wanted and ingame Time is 0
-	if (settings["resetNewGame"]) 
+    return settings["resetNewGame"] && (current.inGameTime == 0);
+}
+
+onReset
+{
+    vars.ResetVars();
+    while (!settings[vars.currentSplit])
     {
-        print("Time: " +current.inGameTime);
-
-		if (current.inGameTime == 0) 
-		{
-            vars.currentSplit = "splitOnChapter2";
-            vars.chapter = 0;
-            vars.gameOver = false;
-			
-            print("Old Split " + vars.currentSplit);
-
-            while (!settings[vars.currentSplit])
-            {
-                if      (vars.currentSplit == "splitOnChapter2"				        )   vars.currentSplit = "splitOnEnterMineValley" ;
-                else if (vars.currentSplit == "splitOnEnterMineValley"		        )   vars.currentSplit = "splitOnChapter3" ;
-                else if (vars.currentSplit == "splitOnChapter3"				        )   vars.currentSplit = "splitOnZurisIsDead" ;
-                else if (vars.currentSplit == "splitOnZurisIsDead"			        )   vars.currentSplit = "splitOnBecomeMiliz" ;
-                else if (vars.currentSplit == "splitOnBecomeMiliz"			        )   vars.currentSplit = "splitOnBecomePaladin" ;
-                else if (vars.currentSplit == "splitOnBecomePaladin"			    )   vars.currentSplit = "splitOnChapter4" ;
-                else if (vars.currentSplit == "splitOnChapter4"				        )   vars.currentSplit = "splitOnChapter5" ;
-                else if (vars.currentSplit == "splitOnChapter5"				        )   vars.currentSplit = "splitOnChapter6" ;
-                else if (vars.currentSplit == "splitOnChapter6"				        )   vars.currentSplit = "splitOnUndeadDragonDies" ;
-                else if (vars.currentSplit == "splitOnUndeadDragonDies"		        )   vars.currentSplit = "splitOnGameOver" ;
-                else if (vars.currentSplit == "splitOnGameOver"				        )   {vars.currentSplit = "GAMEOVER"; vars.gameOver = true;}
-            }
-            print("New Split " + vars.currentSplit);
-            return true;
-		}
-	}
+        vars.NextSplit();
+    }
 }
 
 update 
@@ -190,11 +196,21 @@ update
             vars.chapter = current.chapter;
             if(old.inGameTime == current.inGameTime)
             {
-                vars.FrameCounterInGameTimeUnchanged++;
+                vars.frameCounterInGameTimeUnchanged++;
             }
             else
             {
-                vars.FrameCounterInGameTimeUnchanged = 0;
+                vars.frameCounterInGameTimeUnchanged = 0;
+            }
+
+            if(current.chapter == 6 && current.world == 3 && current.undeadDragon == 0 && vars.undeadDragonIsSpawned && vars.undeadDragonKilledAt == 0) 
+            {
+                vars.undeadDragonKilledAt = current.inGameTime;
+            }
+
+            if(current.chapter == 6 && current.undeadDragon == 1000)
+            {
+                vars.undeadDragonIsSpawned = true;
             }
         }
     }
@@ -204,23 +220,10 @@ onStart
 {
     if(settings["classicSplits"])
     {
-        print("Old Split " + vars.currentSplit);
-
         while (!settings[vars.currentSplit])
         {
-            if      (vars.currentSplit == "splitOnChapter2"				        )   vars.currentSplit = "splitOnEnterMineValley" ;
-            else if (vars.currentSplit == "splitOnEnterMineValley"		        )   vars.currentSplit = "splitOnChapter3" ;
-            else if (vars.currentSplit == "splitOnChapter3"				        )   vars.currentSplit = "splitOnZurisIsDead" ;
-            else if (vars.currentSplit == "splitOnZurisIsDead"			        )   vars.currentSplit = "splitOnBecomeMiliz" ;
-            else if (vars.currentSplit == "splitOnBecomeMiliz"			        )   vars.currentSplit = "splitOnBecomePaladin" ;
-            else if (vars.currentSplit == "splitOnBecomePaladin"			    )   vars.currentSplit = "splitOnChapter4" ;
-            else if (vars.currentSplit == "splitOnChapter4"				        )   vars.currentSplit = "splitOnChapter5" ;
-            else if (vars.currentSplit == "splitOnChapter5"				        )   vars.currentSplit = "splitOnChapter6" ;
-            else if (vars.currentSplit == "splitOnChapter6"				        )   vars.currentSplit = "splitOnUndeadDragonDies" ;
-            else if (vars.currentSplit == "splitOnUndeadDragonDies"		        )   vars.currentSplit = "splitOnGameOver" ;
-            else if (vars.currentSplit == "splitOnGameOver"				        )   {vars.currentSplit = "GAMEOVER"; vars.gameOver = true;}
+            vars.NextSplit();
         }
-        print("New Split " + vars.currentSplit);
     }
 }
 
@@ -228,25 +231,12 @@ onSplit
 {
     if(settings["classicSplits"])
 	{
-        print("Old Split " + vars.currentSplit);
         bool firstRun = true;
-        while (vars.currentSplit != "GAMEOVER" && (firstRun || !settings[vars.currentSplit]))
+        while (!vars.gameOver && (firstRun || !settings[vars.currentSplit]))
         {
             firstRun = false;
-
-            if      (vars.currentSplit == "splitOnChapter2"				        )   vars.currentSplit = "splitOnEnterMineValley" ;
-            else if (vars.currentSplit == "splitOnEnterMineValley"		        )   vars.currentSplit = "splitOnChapter3" ;
-            else if (vars.currentSplit == "splitOnChapter3"				        )   vars.currentSplit = "splitOnZurisIsDead" ;
-            else if (vars.currentSplit == "splitOnZurisIsDead"			        )   vars.currentSplit = "splitOnBecomeMiliz" ;
-            else if (vars.currentSplit == "splitOnBecomeMiliz"			        )   vars.currentSplit = "splitOnBecomePaladin" ;
-            else if (vars.currentSplit == "splitOnBecomePaladin"			    )   vars.currentSplit = "splitOnChapter4" ;
-            else if (vars.currentSplit == "splitOnChapter4"				        )   vars.currentSplit = "splitOnChapter5" ;
-            else if (vars.currentSplit == "splitOnChapter5"				        )   vars.currentSplit = "splitOnChapter6" ;
-            else if (vars.currentSplit == "splitOnChapter6"				        )   vars.currentSplit = "splitOnUndeadDragonDies" ;
-            else if (vars.currentSplit == "splitOnUndeadDragonDies"		        )   vars.currentSplit = "splitOnGameOver" ;
-            else if (vars.currentSplit == "splitOnGameOver"				        )   {vars.currentSplit = "GAMEOVER"; vars.gameOver = true;}
+            vars.NextSplit();
         }
-        print("New Split " + vars.currentSplit);
         return true;
 	}	
 }
@@ -309,25 +299,26 @@ split
 		}
 	}
 	
-    if(vars.currentSplit != "GAMEOVER" && settings["classicSplits"])
+    if(!vars.gameOver && settings["classicSplits"])
 	{
-        // print("Split: " + vars.currentSplit);
-        // print("Chapter: "+ current.chapter);
-        // print("World: " + current.world);
-        // print("Game Over?: " + vars.gameOver);
-        // print("old = current Time?: " + (old.inGameTime == current.inGameTime));
+        print("Split: " + vars.currentSplit);
+        print("Chapter: "+ current.chapter);
+        print("World: " + current.world);
+        print("Game Over?: " + vars.gameOver);
+        print("old = current Time?: " + (old.inGameTime == current.inGameTime));
+        print("DragonDeadAt: " + (vars.undeadDragonKilledAt));
+        print("current Time?: " + (current.inGameTime));
+        print("Same Frame Count: " + (vars.frameCounterInGameTimeUnchanged));
         if (vars.currentSplit == "splitOnChapter2")                     return vars.chapter == 2;
         if (vars.currentSplit == "splitOnEnterMineValley")              return current.world == 2;
         if (vars.currentSplit == "splitOnChapter3")                     return vars.chapter == 3;
         if (vars.currentSplit == "splitOnZurisIsDead")                  return current.zurisHealth <= 0;
         if (vars.currentSplit == "splitOnBecomeMiliz")                  return current.guild == 2;
-        
-        if (vars.currentSplit == "splitOnBecomePaladin")                return current.guild == 5
-        ;
+        if (vars.currentSplit == "splitOnBecomePaladin")                return current.guild == 5;
         if (vars.currentSplit == "splitOnChapter4")                     return vars.chapter == 4;
         if (vars.currentSplit == "splitOnChapter5")                     return vars.chapter == 5;
         if (vars.currentSplit == "splitOnChapter6")                     return vars.chapter == 6;
-        if (vars.currentSplit == "splitOnUndeadDragonDies")             return current.chapter == 6 && current.world == 3 && current.undeadDragon == 0;
-        if (vars.currentSplit == "splitOnGameOver")                     return current.chapter == 6 && current.world == 3 && current.undeadDragon == 0 && !vars.gameOver && vars.FrameCounterInGameTimeUnchanged >= 10;
+        if (vars.currentSplit == "splitOnUndeadDragonDies")             return vars.undeadDragonKilledAt != 0;
+        if (vars.currentSplit == "splitOnGameOver")                     return current.chapter == 6 && current.world == 3 && current.undeadDragon == 0 && !vars.gameOver && vars.frameCounterInGameTimeUnchanged >= 10 && current.inGameTime > (vars.undeadDragonKilledAt + 1000000);
 	}	
 }  
