@@ -1,5 +1,5 @@
 //////////////////////////////////////////////////////////////
-/*              Autosplitter for Gothic 2  v.6              */
+/*              Autosplitter for Gothic 2  v.7              */
 //////////////////////////////////////////////////////////////
 /*                                                          */
 /*Based on the Autosplitter by thekovic                     */
@@ -102,7 +102,7 @@ startup
     settings.Add("splitOnChapter5"					, true	, "Start chapter 5"							    , "classicSplits"	);
     settings.Add("splitOnChapter6"					, true	, "Start chapter 6"							    , "classicSplits"	);
     settings.Add("splitOnUndeadDragonDies"			, false	, "The undead dragon is dead"	                , "classicSplits"	);
-    settings.Add("splitOnGameOver"					, false	, "Talk to the captain"			                , "classicSplits"	);
+    settings.Add("splitOnGameOver"					, true	, "Talk to the captain"			                , "classicSplits"	);
 
     vars.DebugMethods = false;
     vars.DebugInfos = false;
@@ -323,7 +323,7 @@ split
     if(vars.gameOver & settings["classicSplits"])
     {
         if (vars.currentSplit == "splitOnGameOver")                     
-        if (old.inGameTime < current.inGameTime)
+        if (old.inGameTime < current.inGameTime && settings["splitOnGameOver"])
         {
             vars.timerModel.UndoSplit();
             vars.gameOver = false;
