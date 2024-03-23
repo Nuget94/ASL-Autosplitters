@@ -1,5 +1,5 @@
 //////////////////////////////////////////////////////////////
-/*              Autosplitter for Gothic 2  v.5              */
+/*              Autosplitter for Gothic 2  v.6              */
 //////////////////////////////////////////////////////////////
 /*                                                          */
 /*Based on the Autosplitter by thekovic                     */
@@ -28,6 +28,7 @@ state("GothicMod", "v1.12")
 }
 state("Gothic2", "v2.6") 
 {
+
 	long inGameTime:	"ZSPEEDRUNTIMER.DLL", 0x19FE0;
 	int fireDragon:	    "Gothic2.exe",        0x006B40D8, 0x9128, 0xE64;
 	int rockDragon:	    "Gothic2.exe",        0x006B40D8, 0x9128, 0xEA0;
@@ -39,13 +40,13 @@ state("Gothic2", "v2.6")
 }
 state("Gothic2", "v1.30") 
 {
-	long inGameTime:	"ZSPEEDRUNTIMER.DLL", 0x19F70;
-	int chapter: 		"Gothic2.exe",        0x00584C20,   0x2700, 0x9B4;
-    int guild:          "Gothic2.exe",        0x004C0664,   0x21C;
-    int world:          "Gothic2.exe",        0x004C0664,   0xB8,   0x91C;
-    int zurisHealth:    "Gothic2.exe",        0x004C6334,   0xDBC,  0x8,    0x1A4;
-    int undeadDragon:	"Gothic2.exe",        0x005813DC,   0x4,    0x68,   0x2C,   0xEC,   0x24,   0x2CC,   0x1A4;
-    int gold:	        "Gothic2.exe",        0x004C0664,   0x68C,  0x8,    0x4,    0x318;
+	long inGameTime:	    "ZSPEEDRUNTIMER.DLL", 0x19F70;
+	int chapter: 		    "Gothic2.exe",        0x00584C20,   0x2700, 0x9B4;
+    int guild:              "Gothic2.exe",        0x004C0664,   0x21C;
+    int world:              "Gothic2.exe",        0x004C0664,   0xB8,   0x91C;
+    int zurisHealth:        "Gothic2.exe",        0x004C6334,   0xDBC,  0x8,    0x1A4;
+    byte undeadDragonDied:  "Gothic2.exe",        0x0057D830;
+    int gold:	            "Gothic2.exe",        0x004C0664,   0x68C,  0x8,    0x4,    0x318;
 }
 state("Gothic2Classic") 
 {
@@ -53,7 +54,7 @@ state("Gothic2Classic")
 }
 
 
-init 
+init
 {
 	if (modules.First().ModuleMemorySize == 7675904)
     {
@@ -100,8 +101,8 @@ startup
     settings.Add("splitOnChapter4"					, true	, "Start chapter 4"							    , "classicSplits"	);
     settings.Add("splitOnChapter5"					, true	, "Start chapter 5"							    , "classicSplits"	);
     settings.Add("splitOnChapter6"					, true	, "Start chapter 6"							    , "classicSplits"	);
-    settings.Add("splitOnUndeadDragonDies"			, false	, "(Experimental!) The undead dragon is dead"	, "classicSplits"	);
-    settings.Add("splitOnGameOver"					, false	, "(Experimental!) Talk to the captain"			, "classicSplits"	);
+    settings.Add("splitOnUndeadDragonDies"			, false	, "The undead dragon is dead"	                , "classicSplits"	);
+    settings.Add("splitOnGameOver"					, false	, "Talk to the captain"			                , "classicSplits"	);
 
     vars.DebugMethods = false;
     vars.DebugInfos = false;
@@ -123,7 +124,6 @@ startup
         vars.currentSplit = "splitOnChapter2";
         vars.chapter = 0;
         vars.gameOver = false;
-        vars.undeadDragonIsSpawned = false;
         vars.frameCounterInGameTimeUnchanged = 0;
         vars.undeadDragonKilledAt = 0;
         return true;
@@ -152,14 +152,16 @@ startup
     };
     vars.NextSplit = NextSplit;
 
-    ResetVars();
+    vars.timerModel = new TimerModel { CurrentState = timer }; // e.g. in startup
 
+    ResetVars();
 }
 
 reset 
 {
     if(vars.DebugMethods) print("\n    -- reset --");
 	// if automatic reset is wanted and ingame Time is 0
+    if(vars.DebugInfos) print("\n    Current. InGameTime: " + current.inGameTime);
     return settings["resetNewGame"] && (current.inGameTime == 0);
 }
 
@@ -202,14 +204,9 @@ update
                 vars.frameCounterInGameTimeUnchanged = 0;
             }
 
-            if(current.chapter == 6 && current.world == 3 && current.undeadDragon == 0 && vars.undeadDragonIsSpawned && vars.undeadDragonKilledAt == 0) 
+            if(current.chapter == 6 && current.world == 3 && current.undeadDragonDied == 1 && vars.undeadDragonKilledAt == 0) 
             {
                 vars.undeadDragonKilledAt = current.inGameTime;
-            }
-
-            if(current.chapter == 6 && current.undeadDragon == 1000)
-            {
-                vars.undeadDragonIsSpawned = true;
             }
         }
     }
@@ -320,8 +317,18 @@ split
         if (vars.currentSplit == "splitOnChapter5")                     return vars.chapter == 5;
         if (vars.currentSplit == "splitOnChapter6")                     return vars.chapter == 6;
         if (vars.currentSplit == "splitOnUndeadDragonDies")             return vars.undeadDragonKilledAt != 0;
-        if (vars.currentSplit == "splitOnGameOver")                     return current.chapter == 6 && current.world == 3 && current.undeadDragon == 0 && !vars.gameOver && vars.frameCounterInGameTimeUnchanged >= 10 && current.inGameTime > (vars.undeadDragonKilledAt + 1000000);
-	}	
+        if (vars.currentSplit == "splitOnGameOver")                     return current.chapter == 6 && current.world == 3 && !vars.gameOver && vars.frameCounterInGameTimeUnchanged >= 10 && current.undeadDragonDied == 0 && current.inGameTime > (vars.undeadDragonKilledAt + 1000000);
+	}
+
+    if(vars.gameOver & settings["classicSplits"])
+    {
+        if (vars.currentSplit == "splitOnGameOver")                     
+        if (old.inGameTime < current.inGameTime)
+        {
+            vars.timerModel.UndoSplit();
+            vars.gameOver = false;
+        }
+    }	
 }  
 
 onSplit
